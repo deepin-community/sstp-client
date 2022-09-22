@@ -1,0 +1,48 @@
+Developers Information
+
+
+Mailing List
+
+There is currently no mailing lists available for this project. However,
+if you want to participate in conversations, bugs, ask questions related
+to the project.
+
+You are welcome to send emails to the Service Helpdesk:
+
+   contact-project+eivnaes-sstp-client-26690467-issue-@incoming.gitlab.com
+
+All questions asked will be available here:
+
+  https://gitlab.com/eivnaes/sstp-client/-/issues/service_desk
+
+Bugs:
+
+View the list of open issues at gitlab.com:
+
+   https://gitlab.com/eivnaes/sstp-client/-/issues
+
+Patches
+
+Contributions are easiest made by forking sstp-client and creating a 
+merge request on https://gitlab.com. See CONTRIBUTING for additional 
+requirements on getting your contribution accepted.
+
+Developers have permission (and encouragement) to adjust more than the
+file that they are submitting.  Other files that may be adjusted are:
+
+ChangeLog
+	documentation of changes at the code level.
+
+NEWS
+	a history of changes as far as an end user is concerned.
+
+AUTHORS
+	a list of people who want credit for contributions.
+
+TODO
+	a list of things yet to be done.
+
+See section two of Eric Raymond's Software Release Practice HOWTO for
+some useful information on good patching practice.
+
+	http://www.linuxdoc.org/HOWTO/Software-Release-Practice-HOWTO/

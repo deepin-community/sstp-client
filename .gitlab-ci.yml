@@ -1,0 +1,25 @@
+image: ubuntu:latest
+ 
+before_script:
+  - apt update -qq
+  - DEBIAN_FRONTEND=noninteractive apt install -y -qq build-essential autoconf automake pkg-config libtool m4 autoconf-archive libssl-dev libevent-dev ppp-dev
+ 
+stages:
+  - build
+ 
+build-distcheck:
+  stage: build
+  script:
+    - mkdir build
+    - cd build
+    - autoreconf --install --symlink ..
+    - ../configure
+    - make V=1 VERBOSE=1
+    - make check V=1 VERBOSE=1
+    - make install DESTDIR=$(pwd)/../install
+    - make distcheck
+ 
+  # The files which are to be made available in GitLab
+  artifacts:
+    paths:
+      - install/*

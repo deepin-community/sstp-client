@@ -1,0 +1,31 @@
+#!/bin/sh
+set -e
+
+#
+# Creating sstpc group if it isn't already there
+sstp_add_user() {
+    if ! getent group sstpc >/dev/null; then
+            addgroup --system sstpc >/dev/null
+    fi
+}
+
+#
+# creating sstpc user if he isn't already there
+sstp_add_group() {
+    if ! getent passwd sstpc >/dev/null; then
+        adduser \
+            --system \
+            --ingroup sstpc \
+            --home /run/sstpc/ \
+            --gecos "Secure Socket Tunneling Protocol (SSTP) Client" \
+            --shell /bin/false \
+            sstpc  >/dev/null
+    fi
+}
+
+if [ "$1" = configure ]; then
+    sstp_add_user
+    sstp_add_group
+fi
+
+#DEBHELPER#

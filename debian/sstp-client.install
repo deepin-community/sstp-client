@@ -1,0 +1,3 @@
+usr/lib/pppd/*/*.so
+usr/sbin/sstpc
+usr/share/doc/sstp-client/*.example

@@ -1,0 +1,3 @@
+usr/include/sstp-client
+usr/lib/*/libsstp_api.so
+usr/lib/*/pkgconfig
