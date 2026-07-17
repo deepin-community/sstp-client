@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*!
  * @brief API for handling sub-tasks
  *
@@ -5,21 +6,6 @@
  *
  * @author Copyright (C) 2011 Eivind Naess, 
  *      All Rights Reserved
- *
- * @par License:
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 #include <config.h>
 #include <errno.h>
@@ -155,7 +141,11 @@ status_t sstp_task_start(sstp_task_st *task, const char *argv[])
         /* In case the silent flag was set */
         if (task->type == SSTP_TASK_SILENT)
         {
-            task->out = open("/dev/null", O_WRONLY); 
+            task->out = open("/dev/null", O_WRONLY);
+            if (task->out < 0)
+            {
+                sstp_die("Failed to open /dev/null", -1);
+            }
             dup2(task->out, STDOUT_FILENO);
             dup2(task->out, STDERR_FILENO);
         }
@@ -234,12 +224,6 @@ int sstp_task_stdout(sstp_task_st *task)
 }
 
 
-int sstp_task_stdin(sstp_task_st *task)
-{
-    return (task->in);
-}
-
-
 status_t sstp_task_wait(sstp_task_st *task, int *status, int flag)
 {
     /* Collect the child if any */
@@ -289,6 +273,11 @@ void sstp_task_destroy(sstp_task_st *task)
 
 
 #ifdef __SSTP_UNIT_TEST_TASK
+
+void sstp_die(const char *message, int code, ...)
+{
+    exit(-1);
+}
 
 #include <stdio.h>
 

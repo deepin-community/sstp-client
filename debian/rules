@@ -1,4 +1,5 @@
 #!/usr/bin/make -f
+
 PPPD_PLUGIN_DIR := $(shell dh_ppp --plugin-dir)
 
 override_dh_auto_configure:

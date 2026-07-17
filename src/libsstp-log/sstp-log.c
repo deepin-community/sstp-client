@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*!
  * @brief Handle logging for sstp-client
  *
@@ -5,21 +6,6 @@
  *
  * @author Copyright (C) 2011 Eivind Naess, 
  *      All Rights Reserved
- *
- * @par License:
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
 #include <config.h>
@@ -188,7 +174,6 @@ void sstp_log_msg(int level, const char *file, int line, const char *fmt, ...)
         m_ctx.token[0])
     {
         const char *ptr;
-        int index;
         
         ptr = strrchr(file, '/');
         ptr = (ptr != NULL)
@@ -329,7 +314,7 @@ status_t sstp_init_log(const char *name, int opts, int level)
     strncpy(m_ctx.appname, (name == NULL) 
             ? SSTP_DFLT_APPNAME 
             : name,
-        sizeof(m_ctx.appname));
+        sizeof(m_ctx.appname)-1);
 
     return SSTP_OKAY;
 }
@@ -342,7 +327,7 @@ void sstp_log_usage(void)
     printf("  --log-syslog <sock>      Output to syslog\n");
     printf("  --log-stderr             Output to stderr (negates --log-stdout)\n");
     printf("  --log-stdout             Output to stdout (negates --log-stderr)\n");
-    printf("  --log-lineno             Include file/line information in messags\n");
+    printf("  --log-lineno             Include file/line information in messages\n");
     printf("  --log-ident              Specify log identity\n");
     printf("  --log-filter <tok,tok>   Log messages matching a token\n\n");
 }
@@ -397,7 +382,7 @@ status_t sstp_log_init_argv(int *argc, char *argv[])
         }
         
         /* Found no such option */
-        if (option == NULL)
+        if (!option->name)
         {
             continue;
         }
@@ -421,7 +406,7 @@ status_t sstp_log_init_argv(int *argc, char *argv[])
             }
             
             log_ctx_st *ctx = &m_ctx.syslog;
-            strncpy(ctx->file, argv[index+1], sizeof(ctx->file));
+            strncpy(ctx->file, argv[index+1], sizeof(ctx->file)-1);
             break; 
         }
         case 102:
@@ -458,7 +443,7 @@ status_t sstp_log_init_argv(int *argc, char *argv[])
                 break;
             }
             log_ctx_st *ctx = &m_ctx.file;
-            strncpy(ctx->file, argv[index+1], sizeof(ctx->file));
+            strncpy(ctx->file, argv[index+1], sizeof(ctx->file)-1);
             break;
         }   
         case 107:
@@ -588,9 +573,10 @@ status_t sstp_log_fini(void)
 }
 
 
-#ifdef __TEST_SSTP_LOG
+#ifdef __SSTP_UNIT_TEST_LOG
 
 
+#define TEST_SSTP_IDENT     "sstp-client"
 #define TEST_SSTP_HOSTNAME  "sstp-test"
 #define TEST_SSTP_MESSAGE   "This is a test message"
 #define TEST_SSTP_RESULT    "Jan  1, 00:00:00 [sstp-client]: (sstp-log.c:487) This is a test message\n"
@@ -605,6 +591,7 @@ static char message[255];
 int gethostname(char *host, size_t size)
 {
     strncpy(host, TEST_SSTP_HOSTNAME, size);
+    return 0;
 }
 
 
@@ -701,18 +688,6 @@ status_t sstp_logfile_init(log_ctx_st *ctx)
 
 
 /*!
- * @brief Override the option in our unit-test
- */
-const sstp_option_st *sstp_option_get(void)
-{
-    static sstp_option_st opts;
-    opts.dlevel = 3;
-    SSTP_FL_SET(&opts, LOGFILE);
-    return &opts;
-}
-
-
-/*!
  * @brief Execute the unit-test
  */
 int main(int argc, char *argv[])
@@ -721,7 +696,7 @@ int main(int argc, char *argv[])
     int status = 0;
 
     /* Initialize the log-library */
-    status = sstp_init_log();
+    status = sstp_init_log(TEST_SSTP_IDENT, SSTP_OPT_SYSLOG, SSTP_LOG_ERR);
     if (SSTP_OKAY != status)
     {
         printf("Failed to initialize sstp-log\n");
@@ -740,7 +715,7 @@ int main(int argc, char *argv[])
     }
 
     /* Close the log-library */
-    status = sstp_fini_log();
+    status = sstp_log_fini();
     if (SSTP_OKAY != status)
     {
         printf("Failed to de-initialize sstp-log\n");
@@ -755,5 +730,5 @@ done:
     return retval;
 }
 
-#endif /* #ifdef __TEST_SSTP_LOG */
+#endif /* #ifdef __SSTP_UNIT_TEST_LOG */
 

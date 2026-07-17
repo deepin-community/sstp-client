@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*!
  * @brief State machine for SSTP layer
  *
@@ -5,21 +6,6 @@
  *
  * @author Copyright (C) 2011 Eivind Naess, 
  *      All Rights Reserved
- *
- * @par License:
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
 #include <config.h>
@@ -109,7 +95,7 @@ static void sstp_state_send_complete(sstp_stream_st *stream,
 /*!
  * @brief Handle the SSTP control message: CALL_CONNECT_ACK
  */
-static void sstp_state_connect_ack(sstp_state_st *ctx, sstp_msg_t type,
+static status_t sstp_state_connect_ack(sstp_state_st *ctx, sstp_msg_t type,
         sstp_buff_st *buf)
 {
     sstp_attr_st *attrs[SSTP_ATTR_MAX + 1];
@@ -157,8 +143,7 @@ static void sstp_state_connect_ack(sstp_state_st *ctx, sstp_msg_t type,
     memcpy(ctx->nounce, &data[index], len - index);
 
     /* Lets handle the PPP negotiation */
-    ctx->state_cb(ctx->uarg, SSTP_CALL_CONNECT);
-    return;
+    return ctx->state_cb(ctx->uarg, SSTP_CALL_CONNECT);
 
 done:
     
@@ -166,6 +151,8 @@ done:
     {
         ctx->state_cb(ctx->uarg, SSTP_CALL_ABORT);
     }
+
+    return status;
 }
 
 
@@ -337,10 +324,7 @@ static status_t sstp_state_connect_nak(sstp_state_st *ctx, sstp_msg_t type,
     /* Get the status */
     memcpy(&status, &data[index], sizeof(status));
     ctx->status = ntohl(status);
-    index += sizeof(status);
     
-    // TODO: DUMP ATTRIBUTE BUFFER HERE
-
     /* Success! */
     retval = SSTP_OKAY;
 
@@ -353,7 +337,7 @@ done:
 /*!
  * @brief Handle control packets as they arrive
  */
-static void sstp_state_handle_ctrl(sstp_state_st *state, sstp_buff_st *buf,
+static status_t sstp_state_handle_ctrl(sstp_state_st *state, sstp_buff_st *buf,
         sstp_msg_t type)
 {
     status_t ret = SSTP_FAIL;
@@ -362,8 +346,7 @@ static void sstp_state_handle_ctrl(sstp_state_st *state, sstp_buff_st *buf,
     switch (type)
     {
     case SSTP_MSG_CONNECT_ACK:
-        sstp_state_connect_ack(state, type, buf);
-        break;
+        return sstp_state_connect_ack(state, type, buf);
 
     case SSTP_MSG_CONNECT_NAK:
         log_info("Connect NAK Message");
@@ -407,6 +390,7 @@ static void sstp_state_handle_ctrl(sstp_state_st *state, sstp_buff_st *buf,
         log_err("Unhandled Error message: %d", type);
         break;
     }
+    return SSTP_OKAY;
 }
 
 
@@ -429,10 +413,11 @@ static status_t sstp_state_handle_data(sstp_state_st *state,
     return ret;
 }
 
+
 /*!
  * @brief Handle the sstp packet received
  */
-static void sstp_state_handle_packet(sstp_state_st *ctx, sstp_buff_st *buf)
+static status_t sstp_state_handle_packet(sstp_state_st *ctx, sstp_buff_st *buf)
 {
     sstp_msg_t type;
 
@@ -447,23 +432,23 @@ static void sstp_state_handle_packet(sstp_state_st *ctx, sstp_buff_st *buf)
         break;
 
     case SSTP_PKT_CTRL:
-        sstp_state_handle_ctrl(ctx, buf, type);
-        break;
+        return sstp_state_handle_ctrl(ctx, buf, type);
 
     case SSTP_PKT_UNKNOWN:
         log_err("Unrecognized SSTP message");
         break;
     }
+    return SSTP_OKAY;
 }
 
 
 /*!
- * @brief Called from sstp_client_recv_sstp() when a complete sstp packet
- *  has been received.
+ * @brief Called from sstp_client_recv_sstp() when a complete sstp packet has been received.
  */
 static void sstp_state_recv(sstp_stream_st *stream, sstp_buff_st *buf,
         sstp_state_st *ctx, status_t status)
 {
+    int ret = SSTP_OKAY;
     switch (status)
     {
     case SSTP_TIMEOUT:
@@ -480,18 +465,27 @@ static void sstp_state_recv(sstp_stream_st *stream, sstp_buff_st *buf,
         break;
 
     case SSTP_OKAY:
-        sstp_state_handle_packet(ctx, buf);
+        ret = sstp_state_handle_packet(ctx, buf);
         break;
 
+    case SSTP_INPROG:
+        return;
+
     case SSTP_FAIL:
-    default:
         ctx->state_cb(ctx->uarg, status);
         return;
     }
 
-    /* Setup a receiver for SSTP messages */
-    sstp_stream_setrecv(ctx->stream, sstp_stream_recv_sstp, ctx->rx_buf,
-            (sstp_complete_fn) sstp_state_recv, ctx, 60);
+    sstp_buff_reset(ctx->rx_buf);
+    if (ret != SSTP_INPROG) {
+        sstp_stream_req_recv(stream);
+    }
+}
+
+
+void sstp_state_resume_recv(sstp_state_st *ctx)
+{
+    sstp_stream_req_recv(ctx->stream);
 }
 
 
@@ -527,12 +521,6 @@ static status_t sstp_state_send_request(sstp_state_st *ctx)
     /* Send the Call Connect request to the server */
     status = sstp_stream_send(ctx->stream, ctx->tx_buf, (sstp_complete_fn)
             sstp_state_send_complete, ctx, 10);
-    if (SSTP_OKAY == status)
-    {
-        /* Setup a receiver for SSTP messages */
-        sstp_stream_setrecv(ctx->stream, sstp_stream_recv_sstp, ctx->rx_buf,
-                (sstp_complete_fn) sstp_state_recv, ctx, 60);
-    }
  
 done:
 
@@ -679,31 +667,31 @@ status_t sstp_state_accept(sstp_state_st *ctx)
 status_t sstp_state_mppe_keys(sstp_state_st *ctx, unsigned char *send_key, 
         unsigned char* recv_key, size_t key_len)
 {
-    status_t status = SSTP_FAIL;
-    
     /* Truncate if input is larger than supported */
-    if (key_len > sizeof(ctx->mppe_send_key)) {
+    if (key_len > sizeof(ctx->mppe_send_key))
+    {
         key_len = sizeof(ctx->mppe_send_key);
     }
 
     /* Copy the MPPE keys */
-    if (key_len > 0) {
-        memcpy(ctx->mppe_send_key, send_key, key_len);
-    }
+    if (key_len > 0) 
+    {
+        if (send_key)
+        {
+            memcpy(ctx->mppe_send_key, send_key, key_len);
+        }
 
-    if (key_len > 0) {
-        memcpy(ctx->mppe_recv_key, recv_key, key_len);
+        if (recv_key)
+        {
+            memcpy(ctx->mppe_recv_key, recv_key, key_len);
+        }
     }
 
     /* Save the incoming keylen */
     ctx->mppe_key_len = key_len;
 
     /* Success */
-    status = SSTP_OKAY;
-
-done:
-
-    return status;
+    return SSTP_OKAY;
 }
 
 
@@ -744,7 +732,7 @@ void sstp_state_free(sstp_state_st *state)
 status_t sstp_state_create(sstp_state_st **state, sstp_stream_st *stream,
         sstp_state_change_fn state_cb, void *ctx, int mode)
 {
-    int status = 0;
+    int status = SSTP_FAIL;
     int ret    = 0;
 
     /* Allocate memory for the state object */
@@ -773,6 +761,10 @@ status_t sstp_state_create(sstp_state_st **state, sstp_stream_st *stream,
     {   
         goto done;
     }
+
+    /* Configure the receive function */
+    sstp_stream_setrecv((*state)->stream, sstp_stream_recv_sstp, (*state)->rx_buf,
+            (sstp_complete_fn) sstp_state_recv, *state, 60);
 
     /* Success */
     status = SSTP_OKAY;

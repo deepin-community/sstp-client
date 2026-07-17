@@ -16,7 +16,7 @@ long_description    ${name} is a ${description} for Unix that allows access \
                     via SSTP VPN to Microsoft Windows 2008 Server. It tunnels \
                     PPP traffic over SSL.
 
-homepage            https://gitlab.com/eivnaes/sstp-client
+homepage            https://gitlab.com/sstp-project/sstp-client
 master_sites        sourceforge:project/sstp-client/sstp-client/${version}
 
 checksums           rmd160  71b6c4a7f6370c18ca1988f9d1b17c5bde45f882 \

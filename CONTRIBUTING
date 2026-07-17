@@ -4,11 +4,11 @@ How to contribute patches to the PPP project.
 The sstp-client project source code is maintained in a Git repository, 
 which is publicly available at
 
-git: git@gitlab.com:eivnaes/sstp-client.git
+git: git@gitlab.com:sstp-project/sstp-client.git
 
 and
 
-https://gitlab.com/eivnaes/sstp-client.git
+https://gitlab.com/sstp-project/sstp-client.git
 
 The preferred way of contributing to the project is to create a pull request 
 on gitlab.com.  

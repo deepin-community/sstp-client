@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*!
  * @brief Declarations for SSL Handling Routines
  *
@@ -5,21 +6,6 @@
  *
  * @author Copyright (C) 2011 Eivind Naess, 
  *      All Rights Reserved
- *
- * @par License:
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 #ifndef __SSTP_SSL_H__
 #define __SSTP_SSL_H__
@@ -55,12 +41,6 @@ status_t sstp_get_cert_hash(sstp_stream_st *ctx, int proto,
  * @brief Verify the certificate
  */
 status_t sstp_verify_cert(sstp_stream_st *ctx, const char *host, int opts);
-
-
-/*!
- * @brief Check if the activity on the socket is longer than @a seconds
- */
-status_t sstp_last_activity(sstp_stream_st *client, int seconds);
 
 
 /*!
@@ -107,6 +87,12 @@ status_t sstp_stream_recv_http(sstp_stream_st *ctx, sstp_buff_st *buf,
  */
 void sstp_stream_setrecv(sstp_stream_st *ctx, sstp_recv_fn recv_cb,
         sstp_buff_st *buf, sstp_complete_fn complete, void *arg, int timeout);
+
+
+/*!
+ * @brief Request another receive operation based on the previous parameters
+ */
+void sstp_stream_req_recv(sstp_stream_st *ctx);
 
 
 /*!

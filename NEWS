@@ -1,3 +1,26 @@
+Release 1.0.20: (Aug 2, 2024)
+- Adding a new command line switch to allow MacOS users to override the baudrate for ttySX
+- Fixed a coverity issue in sstp-fcs.c
+- Disabled unit-tests for sstp-route.c, caused build failures on nodes with no IPv4 connectivity
+
+
+Release 1.0.19: (June 16, 2023)
+- Support for compiling against pppd-2.5.0
+- Fix for a bug where setting custom user/group with configure resulted in "root"
+- Various cppcheck/coverity scan fixes
+
+
+Announcement: (Feb 22, 2023)
+- Project has been moved to https://gitlab.com/sstp-project/sstp-client and is now
+  member of GitLabs Open Source Program.
+
+
+Release 1.0.18: (Sept 7, 2022)
+- Fixes buffer handling when first writing/reading from pppd.
+- Don't run the add-route tests if you are running as non-root (even with fakeroot)
+- Touch-up of "bashism" to the configure.ac script
+
+
 Release 1.0.17: (March 24, 2022)
 - Fixes to IPv6 handling of parsing, and handling of AAAA records
 - Support for compiling against OpenSSL 3.0.0

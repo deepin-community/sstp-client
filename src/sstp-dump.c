@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*!
  * @brief The packet dump related declarations
  *
@@ -5,21 +6,6 @@
  *
  * @author Copyright (C) 2011 Eivind Naess, 
  *      All Rights Reserved
- *
- * @par License:
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
 #include <arpa/inet.h>
@@ -307,15 +293,15 @@ static const char *sstp_chap_getname(const ppp_hdr_st *hdr)
 /*!
  * @brief Add a message to the string given the right length @a len, and offset @a off
  */
-static int sstp_str_add(char *buf, int *len, int *off, const char *fmt, ...)
+static int sstp_str_add(char *buf, int len, int *off, const char *fmt, ...)
 {
     va_list list;
     int ret = 0;
 
     va_start(list, fmt);
-    ret = vsnprintf(buf + *off, *len - *off, fmt, list);
+    ret = vsnprintf(buf + *off, len - *off, fmt, list);
     va_end(list);
-    if (ret < 0 || ret >= (*len - *off)) 
+    if (ret < 0 || ret >= (len - *off))
     {
         return -1;   
     }
@@ -423,18 +409,22 @@ static int sstp_ccp_opts(const ppp_hdr_st *pkt, char *buf, int len)
         case CI_MPPC:
 
             val = sstp_ppp_opt2int(opt);
-            ret = sstp_str_add(buf, &len, &off, " %s [ %cH %cM %cS %cL %cD %cC ]", name,
+            ret = sstp_str_add(buf, len, &off, " %s [ %cH %cM %cS %cL %cD %cC ]", name,
                     ((val >> 24) & MPPE_H_BIT) ? '+' : '-',
                     (val & MPPE_M_BIT) ? '+' : '-',
                     (val & MPPE_S_BIT) ? '+' : '-',
                     (val & MPPE_L_BIT) ? '+' : '-',
                     (val & MPPE_D_BIT) ? '+' : '-',
                     (val & MPPE_C_BIT) ? '+' : '-');
+            if (ret < 0)
+            {
+                return -1;
+            }
             break;
 
         default:
 
-            ret = sstp_str_add(buf, &len, &off, " %s", name);
+            ret = sstp_str_add(buf, len, &off, " %s", name);
             if (ret < 0)
             {
                 return -1;
@@ -473,7 +463,7 @@ static int sstp_lcp_opts(const ppp_hdr_st *pkt, char *buf, int len)
             case CI_MRU:
             case CI_MRRU:
 
-                ret = sstp_str_add(buf, &len, &off, " %s: %d", name, sstp_ppp_opt2int(opt));
+                ret = sstp_str_add(buf, len, &off, " %s: %d", name, sstp_ppp_opt2int(opt));
                 if (ret < 0)
                 {
                     return -1;
@@ -499,7 +489,7 @@ static int sstp_lcp_opts(const ppp_hdr_st *pkt, char *buf, int len)
                         break;
                 }
 
-                ret = sstp_str_add(buf, &len, &off, " %s: %s", name, astr);
+                ret = sstp_str_add(buf, len, &off, " %s: %s", name, astr);
                 if (ret < 0)
                 {
                     return -1;
@@ -508,7 +498,7 @@ static int sstp_lcp_opts(const ppp_hdr_st *pkt, char *buf, int len)
             } 
             case CI_MAGIC:
                 
-                ret = sstp_str_add(buf, &len, &off, " %s: 0x%08X", name, sstp_ppp_opt2int(opt));
+                ret = sstp_str_add(buf, len, &off, " %s: 0x%08X", name, sstp_ppp_opt2int(opt));
                 if (ret < 0)
                 {
                     return -1;
@@ -524,7 +514,7 @@ static int sstp_lcp_opts(const ppp_hdr_st *pkt, char *buf, int len)
                 {
                     hex[ret-1] = '\0';
 
-                    ret = sstp_str_add(buf, &len, &off, " %s: %s", name, hex);
+                    ret = sstp_str_add(buf, len, &off, " %s: %s", name, hex);
                     if (ret < 0)
                     {
                         return -1;
@@ -612,7 +602,7 @@ static int sstp_ipcp_opts(const ppp_hdr_st *pkt, char *buf, int len)
 
         }
        
-        ret = sstp_str_add(buf, &len, &off, " %s: %s", name, optstr);
+        ret = sstp_str_add(buf, len, &off, " %s: %s", name, optstr);
         if (ret < 0)
         {
             return -1;
@@ -639,7 +629,7 @@ static int sstp_dump_lcp(const ppp_hdr_st *pkt, char *buf, int len)
         return -1;
     }
 
-    ret = sstp_str_add(buf, &len, &off, " %s", sstp_ppp_getcode(pkt->code));
+    ret = sstp_str_add(buf, len, &off, " %s", sstp_ppp_getcode(pkt->code));
     if (ret < 0)
     {
         return -1;
@@ -667,8 +657,8 @@ static int sstp_dump_lcp(const ppp_hdr_st *pkt, char *buf, int len)
             int code = ntohs(*(uint16_t*) sstp_ppp_data(pkt));
             const ppp_handler_st *p = sstp_ppp_handler(code);
             ret = (p)
-                ? sstp_str_add(buf, &len, &off, " %s", p->name)
-                : sstp_str_add(buf, &len, &off, " %0x%04X", code);
+                ? sstp_str_add(buf, len, &off, " %s", p->name)
+                : sstp_str_add(buf, len, &off, " 0x%04X", code);
             if (ret < 0)
             {
                 return -1;
@@ -680,7 +670,7 @@ static int sstp_dump_lcp(const ppp_hdr_st *pkt, char *buf, int len)
         case FSM_ECHOREP:
         case FSM_DISCARDREQ:
 
-            ret = sstp_str_add(buf, &len, &off, " MAGIC: 0x%08X", ntohl(*(uint32_t*) sstp_ppp_data(pkt)));
+            ret = sstp_str_add(buf, len, &off, " MAGIC: 0x%08X", ntohl(*(uint32_t*) sstp_ppp_data(pkt)));
             if (ret < 0)
             {
                 return -1;
@@ -710,7 +700,7 @@ static int sstp_dump_ipcp(const ppp_hdr_st *hdr, char *buf, int len)
         return -1;
     }
     
-    ret = sstp_str_add(buf, &len, &off, " %s", sstp_ppp_getcode(hdr->code));
+    ret = sstp_str_add(buf, len, &off, " %s", sstp_ppp_getcode(hdr->code));
     if (ret < 0)
     {
         return -1;
@@ -733,7 +723,7 @@ static int sstp_dump_ipcp(const ppp_hdr_st *hdr, char *buf, int len)
 
         case FSM_TERMREQ:
         case FSM_TERMACK:
-            ret = sstp_str_add(buf, &len, &off, " MAGIC: 0x%04X", ntohl(*(uint32_t*) sstp_ppp_data(hdr)));
+            ret = sstp_str_add(buf, len, &off, " MAGIC: 0x%04X", ntohl(*(uint32_t*) sstp_ppp_data(hdr)));
             if (ret < 0)
             {
                 return -1;
@@ -741,7 +731,7 @@ static int sstp_dump_ipcp(const ppp_hdr_st *hdr, char *buf, int len)
             break;
 
         case FSM_CODEREJ:
-            ret = sstp_str_add(buf, &len, &off, " PROTO: 0x%04X", (*(uint16_t*) sstp_ppp_data(hdr)));
+            ret = sstp_str_add(buf, len, &off, " PROTO: 0x%04X", (*(uint16_t*) sstp_ppp_data(hdr)));
             if (ret < 0) 
             {
                 return -1;
@@ -777,7 +767,7 @@ static int sstp_dump_chap(const ppp_hdr_st *pkt, char *buf, int len)
     }
 
     /* Prepend default information */
-    ret = sstp_str_add(buf, &len, &off, " ID: %d %s", pkt->id, state);
+    ret = sstp_str_add(buf, len, &off, " ID: %d %s", pkt->id, state);
     if (ret < 0)
     {
         goto done;
@@ -803,7 +793,7 @@ static int sstp_dump_chap(const ppp_hdr_st *pkt, char *buf, int len)
             memcpy(peer, ptr, MIN((sstp_ppp_data_len(pkt)-clen-1), sizeof(peer)));
      
             /* Print the message */
-            ret = sstp_str_add(buf, &len, &off, " [%s], NAME: %s", hex, peer);
+            ret = sstp_str_add(buf, len, &off, " [%s], NAME: %s", hex, peer);
             if (ret < 0)
             {
                 return -1;
@@ -814,7 +804,7 @@ static int sstp_dump_chap(const ppp_hdr_st *pkt, char *buf, int len)
         case CHAP_FAILURE:
 
             /* Print the response */
-            ret = sstp_str_add(buf, &len, &off, " [%s]", ptr);
+            ret = sstp_str_add(buf, len, &off, " [%s]", ptr);
             if (ret < 0)
             {
                 return -1;
@@ -846,7 +836,7 @@ static int sstp_dump_ccp(const ppp_hdr_st *pkt, char *buf, int len)
         return -1;
     }
 
-    ret = sstp_str_add(buf, &len, &pos, " %s", sstp_ppp_getcode(pkt->code));
+    ret = sstp_str_add(buf, len, &pos, " %s", sstp_ppp_getcode(pkt->code));
     if (ret < 0)
     {
         return -1;
@@ -862,7 +852,6 @@ static int sstp_dump_ccp(const ppp_hdr_st *pkt, char *buf, int len)
             ret = sstp_ccp_opts(pkt, buf + pos, len - pos);
             if (ret > 0)
             {
-                len -= ret;
                 pos += ret;
             }
             break;
@@ -891,7 +880,7 @@ static int sstp_dump_eap(const ppp_hdr_st *pkt, char *buf, int len)
     char flag = 0;
     char type = *ptr++;
 
-    ret = sstp_str_add(buf, &len, &pos, "%s %s", sstp_eap_codestr(pkt), 
+    ret = sstp_str_add(buf, len, &pos, "%s %s", sstp_eap_codestr(pkt),
             sstp_eap_typestr(type));
     if (ret < 0)
     {
@@ -909,15 +898,15 @@ static int sstp_dump_eap(const ppp_hdr_st *pkt, char *buf, int len)
 
             if (flag == 0 && plen == 0) 
             {
-                ret = sstp_str_add(buf, &len, &pos, " ACK");
-                if (ret < 0) 
+                ret = sstp_str_add(buf, len, &pos, " ACK");
+                if (ret < 0)
                 {
                     goto done;
                 }
                 break;
             }
 
-            ret = sstp_str_add(buf, &len, &pos, " [%s %s %s]", 
+            ret = sstp_str_add(buf, len, &pos, " [%s %s %s]",
                     EAP_TLS_FLAG_LI & flag ? "L" : "-",
                     EAP_TLS_FLAG_MF & flag ? "M" : "-",
                     EAP_TLS_FLAG_START & flag ? "S" : "-");
@@ -937,7 +926,7 @@ static int sstp_dump_eap(const ppp_hdr_st *pkt, char *buf, int len)
                 memcpy(identity, ptr, plen);
                 identity[plen] = '\0';
 
-                ret = sstp_str_add(buf, &len, &pos, " NAME: \"%s\"", identity);
+                ret = sstp_str_add(buf, len, &pos, " NAME: \"%s\"", identity);
                 if (ret < 0) 
                 { 
                     goto done;
@@ -980,7 +969,7 @@ static int sstp_dump_pap(const ppp_hdr_st *pkt, char *buf, int len)
         return -1;
     }
 
-    ret = sstp_str_add(buf, &len, &pos, " %s", sstp_ppp_getcode(pkt->code));
+    ret = sstp_str_add(buf, len, &pos, " %s", sstp_ppp_getcode(pkt->code));
     if (ret < 0)
     {
         return -1;
@@ -998,7 +987,7 @@ static int sstp_dump_pap(const ppp_hdr_st *pkt, char *buf, int len)
             memcpy(pass, ptr, MIN(plen, sizeof(pass)));
             ptr += plen;
 
-            ret = sstp_str_add(buf, &len, &pos, " NAME=\"%s\", PASSWORD: \"%s\"", name, pass);
+            ret = sstp_str_add(buf, len, &pos, " NAME=\"%s\", PASSWORD: \"%s\"", name, pass);
             if (ret < 0)
             {
                 return -1;
@@ -1012,7 +1001,7 @@ static int sstp_dump_pap(const ppp_hdr_st *pkt, char *buf, int len)
             memcpy(name, ptr, MIN(plen, sizeof(name)));
             ptr += plen;
 
-            ret = sstp_str_add(buf, &len, &pos, " RESULT=\"%s\"", name);
+            ret = sstp_str_add(buf, len, &pos, " RESULT=\"%s\"", name);
             if (ret < 0)
             {
                 return -1;
@@ -1063,8 +1052,6 @@ static const ppp_handler_st *sstp_ppp_handler(int proto)
 static int sstp_dump_ppp(unsigned char *buf, size_t len, const char *file, int line)
 {
     const ppp_handler_st *hdl = NULL;
-    char msg[1024] = {};
-    int ret = 0;
     int proto = 0;
 
     /* Skip PPP frame header */
@@ -1082,6 +1069,9 @@ static int sstp_dump_ppp(unsigned char *buf, size_t len, const char *file, int l
     hdl = sstp_ppp_handler(proto);
     if (hdl) 
     {
+        char msg[1024] = {};
+        int ret = 0;
+
         /* Validate the length */
         ppp_hdr_st *pkt = (ppp_hdr_st*) buf;
         if (ntohs(pkt->len) == len)
@@ -1112,35 +1102,8 @@ void sstp_pkt_dump(sstp_buff_st *buf, sstp_direction_t dir, const char *file, in
 {
     sstp_pkt_st *pkt   = NULL;
     sstp_ctrl_st *ctrl = NULL;
-    int type  = 0;
-    int alen  = 0;
     int index = 0;
-    int ret   = 0;
     int pktlen= 0;
-
-    static const char *sstp_msg_type[] =
-    {
-        NULL,
-        "CONNECT REQUEST",
-        "CONNECT ACK",
-        "CONNECT NAK",
-        "CONNECTED",
-        "ABORT",
-        "DISCONNECT",
-        "DISCONNECT ACK",
-        "ECHO REQUEST",
-        "ECHO REPLY",
-    };
-
-    static const char *sstp_attr_type[] = 
-    {
-        "NO ERROR",
-        "ENCAP PROTO",
-        "STATUS INFO",
-        "CRYPTO BIND",
-        "CRYPTO BIND REQ"
-    };
-
 
     pkt    = (sstp_pkt_st*) sstp_buff_data(buf, index);
     index += (sizeof(sstp_pkt_st));
@@ -1160,10 +1123,34 @@ void sstp_pkt_dump(sstp_buff_st *buf, sstp_direction_t dir, const char *file, in
     /* Handle control packets */
     if (SSTP_MSG_FLAG_CTRL & pkt->flags)
     {
-        ctrl   = (sstp_ctrl_st*) sstp_buff_data(buf, index);
-        index += (sizeof(sstp_ctrl_st));
-        type   = (ntohs(ctrl->type));
-        alen   = (ntohs(ctrl->nattr));
+        ctrl     = (sstp_ctrl_st*) sstp_buff_data(buf, index);
+        index   += (sizeof(sstp_ctrl_st));
+        int type = (ntohs(ctrl->type));
+        int alen = (ntohs(ctrl->nattr));
+
+        static const char *sstp_msg_type[] =
+        {
+            NULL,
+            "CONNECT REQUEST",
+            "CONNECT ACK",
+            "CONNECT NAK",
+            "CONNECTED",
+            "ABORT",
+            "DISCONNECT",
+            "DISCONNECT ACK",
+            "ECHO REQUEST",
+            "ECHO REPLY",
+        };
+
+        static const char *sstp_attr_type[] =
+        {
+            "NO ERROR",
+            "ENCAP PROTO",
+            "STATUS INFO",
+            "CRYPTO BIND",
+            "CRYPTO BIND REQ"
+        };
+
 
         /* Control Type, num attributes */
         sstp_log_msg(SSTP_LOG_TRACE, file, line, "  TYPE(%d): %s, ATTR(%d):",
@@ -1203,7 +1190,7 @@ void sstp_pkt_dump(sstp_buff_st *buf, sstp_direction_t dir, const char *file, in
         int len = MIN(pktlen-index,16);
         char hex[96] = {};
 
-        ret = sstp_bin2hex("0x%02X ", hex, sizeof(hex), (unsigned char*) buf->data + index, len);
+        int ret = sstp_bin2hex("0x%02X ", hex, sizeof(hex), (unsigned char*) buf->data + index, len);
         if (ret > 0) 
         {
             sstp_log_msg(SSTP_LOG_TRACE, file, line, "  %s", hex);

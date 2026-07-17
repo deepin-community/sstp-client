@@ -1,25 +1,46 @@
-image: ubuntu:latest
- 
-before_script:
-  - apt update -qq
-  - DEBIAN_FRONTEND=noninteractive apt install -y -qq build-essential autoconf automake pkg-config libtool m4 autoconf-archive libssl-dev libevent-dev ppp-dev
- 
 stages:
   - build
- 
-build-distcheck:
+  - coverity
+
+build-dist:
+  image: registry.gitlab.com/sstp-project/sstp-client/build-image:latest
   stage: build
   script:
-    - mkdir build
-    - cd build
-    - autoreconf --install --symlink ..
-    - ../configure
-    - make V=1 VERBOSE=1
-    - make check V=1 VERBOSE=1
-    - make install DESTDIR=$(pwd)/../install
-    - make distcheck
- 
-  # The files which are to be made available in GitLab
+    - sh autogen.sh
+    - make dist-gzip
   artifacts:
     paths:
-      - install/*
+      - sstp-client*.tar.gz
+
+build:
+  image: registry.gitlab.com/sstp-project/sstp-client/build-image:latest
+  stage: build
+  needs: [ "build-dist" ]
+  script:
+    - tar zxf sstp-client-*.tar.gz
+    - cd sstp-client-*/
+    - mkdir -p build
+    - cd build
+    - ../configure
+    - make -j V=1
+    - make -j check V=1
+    - make -j install
+    - make -j uninstall
+  variables:
+    GIT_STRATEGY: none
+
+coverity-scan:
+  image: registry.gitlab.com/sstp-project/sstp-client/coverity-image:latest
+  stage: coverity
+  only:
+    refs:
+      - master
+  script:
+    - ./autogen.sh
+    - ./configure
+    - cov-build --dir cov-int make -j
+    - tar cfz cov-int.tar.gz cov-int
+    - curl -s "https://scan.coverity.com/builds?project=$COVERITY_SCAN_PROJECT_NAME"
+        --form token="$COVERITY_SCAN_TOKEN" --form email="$GITLAB_USER_EMAIL"
+        --form file=@cov-int.tar.gz --form version="`git describe --tags`"
+        --form description="`git describe --tags` / $CI_COMMIT_TITLE / $CI_COMMIT_REF_NAME:$CI_PIPELINE_ID"

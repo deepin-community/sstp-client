@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*!
  * @brief This process the HTTP handshake for SSTP
  *
@@ -5,21 +6,6 @@
  *
  * @author Copyright (C) 2011 Eivind Naess, 
  *      All Rights Reserved
- *
- * @par License:
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 #include <config.h>
 #include <string.h>
@@ -44,10 +30,6 @@
  *  Server: Microsoft-HTTPAPI/2.0
  *  Date: Sat, 19 Feb 2011 02:13:44 GMT
  * @endcode
- *
- * @par TODO:
- *  We need to improve the receive logic in this file to make sure we drain 
- *  the entire HTTP request and nothing more.
  */
 
 /*!
@@ -116,7 +98,6 @@ status_t sstp_http_create(sstp_http_st **http, const char *server,
 
     /* Set a random UUID */
     sstp_get_guid((*http)->uuid, sizeof((*http)->uuid));
-
     return SSTP_OKAY;
 }
 
@@ -217,11 +198,13 @@ static void sstp_http_send_complete(sstp_stream_st *stream, sstp_buff_st *buf,
     if (SSTP_OKAY != result)
     {
         http->done_cb(http->uarg, SSTP_FAIL);
+        return;
     }
 
     /* Setup a receiver for HTTP messages */
-    sstp_stream_setrecv(stream, sstp_stream_recv, http->buf,
+    sstp_stream_setrecv(stream, sstp_stream_recv_http, http->buf,
             (sstp_complete_fn) sstp_recv_hello_complete, http, 60);
+
 }
 
 
@@ -232,6 +215,7 @@ static void sstp_http_send_proxy_complete(sstp_stream_st *stream, sstp_buff_st *
     if (SSTP_OKAY != result)
     {
         http->done_cb(http->uarg, SSTP_FAIL);
+        return;
     }
 
     /* Setup a receiver for HTTP messages */
@@ -275,8 +259,7 @@ static status_t sstp_http_send_hello(sstp_http_st *http,
     }
 
     /* Add the UUID attribute */
-    ret = sstp_buff_print(http->buf, "SSTPCORRELATIONID: %s\r\n\r\n", 
-            http->uuid, strlen(http->uuid));
+    ret = sstp_buff_print(http->buf, "SSTPCORRELATIONID: %s\r\n\r\n", http->uuid);
     if (SSTP_OKAY != ret)
     {
         return ret;
@@ -297,16 +280,8 @@ status_t sstp_http_handshake(sstp_http_st *http, sstp_stream_st *stream)
     {
     case SSTP_MODE_CLIENT:
 
-        /* Setup a receiver for HTTP messages */
-        sstp_stream_setrecv(stream, sstp_stream_recv, http->buf,
-                (sstp_complete_fn) sstp_recv_hello_complete, http, 60);
-
         /* Send the sstp hello to the server */
         ret = sstp_http_send_hello(http, stream);
-        if (SSTP_OKAY != ret)
-        {
-            break;
-        }
         break;
 
     case SSTP_MODE_SERVER:
@@ -393,7 +368,7 @@ void sstp_http_setcreds(sstp_http_st *http, const char *user,
  */
 void sstp_http_setuuid(sstp_http_st *http, const char *uuid)
 {
-    strncpy(http->uuid, uuid, sizeof(http->uuid));
+    strncpy(http->uuid, uuid, sizeof(http->uuid)-1);
 }
 
 
@@ -410,7 +385,7 @@ static void sstp_recv_proxy_complete(sstp_stream_st *client,
     int code  = 0;
     int ret   = 0;
 
-    /* TODO: Handle timeout, error, etc */
+    /* Check if receive was successful */
     if (SSTP_OKAY != status)
     {
         goto done;
