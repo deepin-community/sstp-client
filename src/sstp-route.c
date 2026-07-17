@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*!
  * @brief This is the sstp-client code
  *
@@ -5,21 +6,6 @@
  *
  * @author Copyright (C) 2012 Eivind Naess, 
  *      All Rights Reserved
- *
- * @par License:
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
 #include <config.h>
@@ -180,8 +166,6 @@ static int sstp_route_newmsg(sstp_route_ctx_st *ctx,
     struct sockaddr_dl *sdl = NULL;
     struct rt_msghdr *rtm   = NULL;
     struct sockaddr  *sa    = NULL;
-    int retval = -1;
-    int len = 0;
     char *cp = NULL;
 
     memset(ctx->buf, 0, sizeof(ctx->buf));
@@ -408,13 +392,11 @@ void sstp_route_done(sstp_route_ctx_st *ctx)
 static int sstp_route_recv(sstp_route_ctx_st *ctx)
 {
     struct nlmsghdr *nlh = (struct nlmsghdr*) ctx->buf;
-    int len = 0;
-
     ctx->len = 0;
 
     do
     {
-        len = recv(ctx->sock, ctx->buf + ctx->len, 
+        int len = recv(ctx->sock, ctx->buf + ctx->len,
                 sizeof(ctx->buf) - ctx->len, 0);
         if (len == -1)
         {
@@ -766,8 +748,10 @@ done:
     
     if (r)
     {
-        if (r->sock)
+        if (r->sock >= 0)
+        {
             close(r->sock);
+        }
         free(r);
     }
 
@@ -797,13 +781,14 @@ void sstp_route_done(sstp_route_ctx_st *ctx)
 
 #else   /* #ifdef HAVE_NETLINK */
 
+#define CMD_SIZE    1024
 
 int sstp_route_replace(sstp_route_ctx_st *ctx, sstp_route_st *route)
 {
-    char cmd[255];
+    char cmd[CMD_SIZE];
     FILE *proc = NULL;
 
-    snprintf(cmd, sizeof(cmd), "ip route replace %s", route->ipcmd);
+    snprintf(cmd, sizeof(cmd)-1, "ip route replace %s", route->ipcmd);
     proc = popen(cmd, "r");
     if (!proc) 
     {
@@ -816,10 +801,10 @@ int sstp_route_replace(sstp_route_ctx_st *ctx, sstp_route_st *route)
 
 int sstp_route_delete(sstp_route_ctx_st *ctx, sstp_route_st *route)
 {
-    char cmd[255];
+    char cmd[CMD_SIZE];
     FILE *proc = NULL;
 
-    snprintf(cmd, sizeof(cmd), "ip route delete %s", route->ipcmd);
+    snprintf(cmd, sizeof(cmd)-1, "ip route delete %s", route->ipcmd);
     proc = popen(cmd, "r");
     if (!proc) 
     {
@@ -833,7 +818,7 @@ int sstp_route_delete(sstp_route_ctx_st *ctx, sstp_route_st *route)
 int sstp_route_get(sstp_route_ctx_st *ctx, struct sockaddr *dst,
         sstp_route_st *route)
 {
-    char cmd[255];
+    char cmd[CMD_SIZE];
     char ip[INET6_ADDRSTRLEN];
     FILE *proc = NULL;
     char *ptr  = NULL;
@@ -843,7 +828,7 @@ int sstp_route_get(sstp_route_ctx_st *ctx, struct sockaddr *dst,
         return -1;
     }
     
-    snprintf(cmd, sizeof(cmd), "ip route get %s", ip);
+    snprintf(cmd, sizeof(cmd)-1, "ip route get %s", ip);
 
     proc = popen(cmd, "r");
     if (!proc) 
@@ -855,7 +840,7 @@ int sstp_route_get(sstp_route_ctx_st *ctx, struct sockaddr *dst,
     if (!ptr) 
     {
         pclose(proc);
-        return -1;
+        return 77;      // Skip this test in case 'ip' wasn't found on the system
     }
 
     pclose(proc);
@@ -928,13 +913,15 @@ int main(int argc, char *argv[])
     inet_pton(AF_INET, "4.4.2.2", &dst.sin_addr);
     dst.sin_family = AF_INET;
 
-    if (sstp_route_init(&ctx))
+    retval = sstp_route_init(&ctx);
+    if (retval != 0)
     {
         printf("Could not initialize route object\n");
         goto done;
     }
 
-    if (sstp_route_get(ctx, (struct sockaddr*) &dst, &route))
+    retval = sstp_route_get(ctx, (struct sockaddr*) &dst, &route);
+    if (retval != 0)
     {
         printf("Could not get route\n");
         goto done;
@@ -952,8 +939,17 @@ int main(int argc, char *argv[])
     /* Only if we run as root, test the add/del of the route */
     if (getuid() == 0)
     {
-        if (sstp_route_replace(ctx, &route))
+        retval = sstp_route_replace(ctx, &route);
+        if (retval != 0)
         {
+            /* if it fails due to permissions, likely run under fakeroot; report success */
+            if (errno == EPERM)
+            {
+		printf("No permission to add route, skipping test\n");
+                retval = EXIT_SUCCESS;
+                goto done;
+            }
+
             printf("Could not add route\n");
             goto done;
         }
@@ -962,7 +958,8 @@ int main(int argc, char *argv[])
         printf("Added route to %s via %s\n", dst_ip, 
                 route.ifname);
 #endif
-        if (sstp_route_delete(ctx, &route))
+        retval = sstp_route_delete(ctx, &route);
+        if (retval != 0)
         {
             printf("Could not del route\n");
             goto done;

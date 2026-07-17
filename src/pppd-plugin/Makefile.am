@@ -5,6 +5,10 @@ pppd_plugin_LTLIBRARIES      = sstp-pppd-plugin.la
 sstp_pppd_plugin_la_CFLAGS   = -I$(top_srcdir)/include $(PPPD_PLUGIN_CFLAGS)
 sstp_pppd_plugin_la_LDFLAGS  = -module -avoid-version
 sstp_pppd_plugin_la_LIBADD   = ../libsstp-api/libsstp_api.la
-sstp_pppd_plugin_la_SOURCES  = sstp-plugin.c sstp-mppe.c sstp-mppe.h
+sstp_pppd_plugin_la_SOURCES  = sstp-plugin.c sstp-pppd-compat.h
+
+if !WITH_PPP_MPPE_KEYS
+sstp_pppd_plugin_la_SOURCES  += sstp-mppe.c
+endif
 
 endif

@@ -1,3 +1,120 @@
+Fri Aug 2 16:26:48 2024  Eivind Næss <eivnaes@yahoo.com>
+
+	* Use SPDX License Idenfiers instead of boilerplate GNU GPL license in each headerfile
+
+Fri Aug 2 16:08:25 2024  Eivind Næss <eivnaes@yahoo.com>
+
+	* Avoid a possible integer overflow according to coverity
+
+Fri Aug 2 16:01:01 2024  Eivind Næss <eivnaes@yahoo.com>
+
+	* Fixing up invalid formatting using sprintf
+
+Thu Aug 1 15:08:28 2024  Eivind Næss <eivnaes@yahoo.com>
+
+	* Disable unit-tests for route sub-system
+
+Thu Aug 1 14:52:21 2024  Eivind Næss <eivnaes@yahoo.com>
+
+	* Add a parameter to increase the ttyS0 speed
+
+Tue Jun 6 22:45:27 2023  Mikhail Novosyolov <m.novosyolov@rosalinux.ru>
+
+	* Fix setting custom user/group
+	   setting --enable-user=sstp-client resulted to "root"
+
+Sun Apr 23 12:14:21 2023 Mike Gilbert <floppym@gentoo.org>
+
+	* Replace sstp-mppe.h with sstp-pppd-compat.h
+
+Wed Apr 5 16:39:28 2023  Pavel Skuratovich <chupaka@gmail.com>
+
+	* Fix a typo in README.md
+
+Sat Mar 25 22:09:12 2023  Eivind Næss <eivnaes@yahoo.com>
+
+	* Making support for pppd-2.5.0 more transparent
+	  - This is done by introducing a new headerfile sstp-pppd-compat.h that
+	    masks any differences in version between 2.4.9 and 2.5.0.
+
+Mon Feb 27 08:45:10 2023  Eivind Næss <eivnaes@yahoo.com>
+
+	* Trying to add coverity scan using the linux executables
+
+Fri Feb 24 04:41:47 2023  Eivind Næss <eivnaes@yahoo.com>
+
+	* Zero address structure first, then set the AF_UNIX and path
+
+Thu Feb 23 06:34:26 2023  Eivind Næss <eivnaes@yahoo.com>
+
+	* When including pppd.h, no need to include stdbool.h if config.h defines HAVE_STDBOOL_H
+
+Thu Feb 23 06:21:37 2023  Eivind Næss <eivnaes@yahoo.com>
+
+	* Adding back the auth notifier since it is supported on version 2.4.9 and above
+
+Wed Feb 22 22:17:59 2023  Eivind Næss <eivnaes@yahoo.com>
+
+	* Fixing a issue when compiling against 2.4.9 or earlier versions of pppd
+
+Thu Feb 23 04:49:21 2023  Eivind Næss <eivnaes@yahoo.com>
+
+	* Updating project references to point to https://gitlab.com/sstp-project/sstp-client
+	   (was https://gitlab.com/evinaes/sstp-client)
+
+Thu Feb 23 04:48:34 2023  Eivind Næss <eivnaes@yahoo.com>
+
+	* Initial support for compiling against pppd version 2.5.0
+
+Sun Feb 19 21:49:28 2023  Eivind Næss <eivnaes@yahoo.com>
+
+	* Additional fixes for issues found by cppcheck and coverity static code analysis tools
+
+Fri Feb 17 17:09:26 2023  Eivind Næss <eivnaes@yahoo.com>
+
+	* Updating the coverity status
+
+Wed Feb 15 08:33:25 2023  Eivind Næss <eivnaes@yahoo.com>
+
+	* Removing a check for NULL, thus making cppcheck less noisy
+
+Wed Feb 15 08:24:42 2023  Eivind Næss <eivnaes@yahoo.com>
+
+	* Add a check for null on user and password
+
+Wed Feb 15 11:28:11 2023  Ilya Shipitsin <chipitsine@gmail.com>
+
+	* sstp-log.c: fix potential null pointer dereference found by cppcheck
+	* sstp-log.c: Either the condition 'option==NULL' is redundant or there is possible null pointer dereference: option
+
+Mon Jan 23 02:28:18 2023  Sam James <sam@gentoo.org>
+
+	* Workaround for broken pppd.h header for memcpy.
+	     Bug: https://bugs.gentoo.org/870865
+
+Mon Jan 23 02:26:28 2023  Sam James <sam@gentoo.org>
+
+	* Add missing <time.h> include needed for time_t. Fixes build w/ GCC 12 on musl.
+	     Bug: https://bugs.gentoo.org/854858
+
+Wed Sep 7 04:23:11 2022	 Eivind Naess <eivnaes@yahoo.com>
+
+	* Fix for issue #13 by introducing a small delay in writing to pppd.
+	  - The longer story is that it appears that imediately writing to the
+	    PTY after doing fork/exec to the process caused sstpc to read the
+	    same packet back. This change adds another state causing a delay
+	    in reading SSTP packets from the server until the first PPP packet
+	    can be read from pppd thus avoiding this.
+
+Tue Sep 6 20:00:00 2022  Eivind Naess <eivnaes@yahoo.com>
+
+	* Fixed an issue where the pty socket ended up reading back what it wrote because pppd
+		wasn't properly initalized. sstpc can now connect to accel-pppd sstp server.
+
+Tue May 17 08:00:00 2022  Eivind Naess <eivnaes@yahoo.com>
+
+	* Fixed an issue with "make check" under fakeroot environment
+
 Fri Mar 24 20:00:00 2022  Eivind Naess <eivnaes@yahoo.com>
 
 	* sstp-client 1.0.17 released

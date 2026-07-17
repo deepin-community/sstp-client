@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*!
  * @brief Event API for sstp-client
  *
@@ -5,21 +6,6 @@
  *
  * @author Copyright (C) 2011 Eivind Naess, 
  *      All Rights Reserved
- *
- * @par License:
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
 #include <config.h>
@@ -39,6 +25,8 @@
 #include "sstp-private.h"
 #include "sstp-client.h"
 
+
+#define SSTP_MAX_MSGLEN 512
 
 /*!
  * @brief The event notification context structure
@@ -76,7 +64,6 @@ static int sstp_event_auth(sstp_event_st *ctx, int sock,
     int ret    = SSTP_OKAY;
     int retval = SSTP_FAIL;
     sstp_api_attr_st *list[SSTP_API_ATTR_MAX+1];
-    sstp_api_attr_st *attr;
     
     /* Allocate buffer on stack */
     buff = alloca(msg->msg_len);
@@ -207,6 +194,12 @@ static void sstp_event_accept(int fd, short event, sstp_event_st *ctx)
         goto done;
     }
 
+    if (msg.msg_len > SSTP_MAX_MSGLEN)
+    {
+        log_err("Message too long");
+        goto done;
+    }
+
     switch (type)
     {
     /* Receive the MPPE keys */
@@ -227,7 +220,7 @@ static void sstp_event_accept(int fd, short event, sstp_event_st *ctx)
 done:
  
     /* Close the client socket */
-    if (sock > 0)
+    if (sock >= 0)
     {
         close(sock);
     }
@@ -349,7 +342,15 @@ status_t sstp_event_create(sstp_event_st **ctx, sstp_option_st *opts,
     status = SSTP_OKAY;
 
 done:
-    
+
+    if (status != SSTP_OKAY)
+    {
+        if (sock >= 0)
+        {
+            close(sock);
+        }
+    }
+
     return (status);
 }
 

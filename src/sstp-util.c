@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*!
  * @brief Utility Functions
  *
@@ -5,21 +6,6 @@
  *
  * @author Copyright (C) 2011 Eivind Naess,
  *      All Rights Reserved
- *
- * @par License:
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
 #include <config.h>
@@ -60,28 +46,50 @@ status_t sstp_set_nonbl(int sock, int state)
 
 char *sstp_get_guid(char *buf, int len)
 {
-    uint32_t data1, data4;
-    uint16_t data2, data3;
-    unsigned int seed;
-    int ret;
-
-    seed = time(NULL) | getpid();
-    srand (seed);
-
-    data1 = (rand() + 1);
-    data2 = (rand() + 1);
-    data3 = (rand() + 1);
-    data4 = (rand() + 1);
-
-    /* Create the GUID string */
-    ret = snprintf(buf, len, "{%.4X-%.2X-%.2X-%.4X}", data1, data2,
-            data3, data4);
-    if (ret <= 0 || ret > len)
+    int status = SSTP_FAIL;
+    int fd = open("/dev/urandom", O_RDONLY);
+    if (fd >= 0)
     {
-        return NULL;
+        uint32_t data1, data4;
+        uint16_t data2, data3;
+
+        int ret = read(fd, &data1, sizeof(data1));
+        if (ret != sizeof(data1)) {
+            goto done;
+        }
+
+        ret = read(fd, &data2, sizeof(data2));
+        if (ret != sizeof(data2)) {
+            goto done;
+        }
+
+        ret = read(fd, &data3, sizeof(data3));
+        if (ret != sizeof(data3)) {
+            goto done;
+        }
+
+        ret = read(fd, &data4, sizeof(data4));
+        if (ret != sizeof(data4)) {
+            goto done;
+        }
+
+        /* Create the GUID string */
+        ret = snprintf(buf, len, "{%.4X-%.2X-%.2X-%.4X}", data1, data2,
+                data3, data4);
+        if (ret <= 0 || ret > len)
+        {
+            goto done;
+        }
+
+        status = SSTP_OKAY;
+
+done:
+
+        close(fd);
     }
 
-    return buf;
+    return (status == SSTP_OKAY)
+            ? buf : NULL;
 }
 
 
@@ -125,10 +133,6 @@ static int is_ipv4(const char *str)
  */
 static int is_hostname(const char *str)
 {
-    const char *ptr = str;
-    const char *ptr1 = ptr;
-    int flags = 0x01;
-
     if (strlen(str) > 253)
     {
         return 0;
@@ -431,9 +435,11 @@ int sstp_get_gid(const char *name)
 
 int sstp_sandbox(const char *path, const char *user, const char *group)
 {
+    int retval = -1;
     int gid = -1;
     int uid = -1;
-    int retval = -1;
+    int cgid = getgid();
+    int cuid = getuid();
 
     if (user)
     {
@@ -448,23 +454,23 @@ int sstp_sandbox(const char *path, const char *user, const char *group)
     /* Change the root directory */
     if (path)
     {
-        if (chdir(path) != 0)
-        {
-            log_warn("Could not change working directory, %s (%d)",
-                strerror(errno), errno);
-            goto done;
-        }
-
         if (chroot(path) != 0)
         {
             log_warn("Could not change root directory, %s (%d)",
                 strerror(errno), errno);
             goto done;
         }
+
+        if (chdir("/") != 0)
+        {
+            log_warn("Could not change working directory, %s (%d)",
+                strerror(errno), errno);
+            goto done;
+        }
     }
 
     /* Set the group id (before setting user id) */
-    if (gid >= 0 && gid != getgid())
+    if (gid >= 0 && gid != cgid)
     {
         /* Call setgroups prior to dropping privileges (setuid,setgid) */
         setgroups(0, NULL);
@@ -478,7 +484,7 @@ int sstp_sandbox(const char *path, const char *user, const char *group)
     }
 
     /* Setting the user id */
-    if (uid >= 0 && uid != getuid())
+    if (uid >= 0 && uid != cuid)
     {
         if (setuid(uid) != 0)
         {
@@ -496,15 +502,14 @@ done:
 }
 
 
-int sstp_bin2hex(const char *fmt, char *outbuf, int outlen, unsigned char *inbuf, int inlen)
+int sstp_bin2hex(const char *fmt, char *outbuf, int outlen, const unsigned char *inbuf, int inlen)
 {
     int count   = 0;
     int offset  = 0;
-    int len     = 0;
 
     for (count = 0; count < inlen; count++)
     {
-        len = sprintf(&outbuf[offset], fmt, (inbuf[count]) & 0xFF);
+        int len = sprintf(&outbuf[offset], fmt, (inbuf[count]) & 0xFF);
         if (len < 0 || len >= (outlen - offset))
         {
             return -1;
@@ -757,7 +762,6 @@ status_t test_urls_with_user_and_pass()
 
 int main(int argc, char *argv[])
 {
-    sstp_url_st *url;
     int status = SSTP_FAIL;
     int retval = 0;
 

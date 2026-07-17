@@ -13,8 +13,6 @@ utest_chap_SOURCES  = sstp-chap.c
 utest_chap_CFLAGS   = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_CHAP=1
 utest_fcs_SOURCES   = sstp-fcs.c
 utest_fcs_CFLAGS    = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_FCS=1
-utest_route_SOURCES = sstp-route.c
-utest_route_CFLAGS  = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_ROUTE=1
 utest_utils_SOURCES = sstp-util.c
 utest_utils_CFLAGS  = -I$(top_srcdir)/include -D__SSTP_UNIT_TEST_UTILS=1
 utest_utils_LDADD   = libsstp-log/libsstp_log.la
@@ -24,7 +22,6 @@ check_PROGRAMS      =   \
     utest_cmac          \
     utest_chap          \
     utest_fcs           \
-    utest_route         \
     utest_utils
 
 TESTS= $(check_PROGRAMS)

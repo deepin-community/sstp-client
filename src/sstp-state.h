@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*!
  * @brief State machine for SSTP layer
  *
@@ -5,21 +6,6 @@
  *
  * @author Copyright (C) 2011 Eivind Naess, 
  *      All Rights Reserved
- *
- * @par License:
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 #ifndef __SSTP_STATE_H__
 #define __SSTP_STATE_H__
@@ -55,7 +41,7 @@ typedef struct sstp_state sstp_state_st;
  *    - SSTP_ST_ESTABLISH   Tunnel Established
  *    - SSTP_ST_DISCONNECT  Connection disconnected
  */
-typedef void (*sstp_state_change_fn)(void *arg, sstp_state_t state);
+typedef status_t (*sstp_state_change_fn)(void *arg, sstp_state_t state);
 
 
 /*!
@@ -90,6 +76,12 @@ status_t sstp_state_mppe_keys(sstp_state_st *state, unsigned char *skey,
  */
 void sstp_state_set_forward(sstp_state_st *state, sstp_state_forward_fn 
         forward, void *arg);
+
+/**
+ * @brief Enable the receive operation on the SSTP stream
+ */
+void sstp_state_resume_recv(sstp_state_st *state);
+
 
 /*!
  * @brief Will start the SSTP handshake

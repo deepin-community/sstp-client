@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*!
  * @brief Command line parsing for sstp-client
  *
@@ -5,21 +6,6 @@
  *
  * @author Copyright (C) 2011 Eivind Naess, 
  *      All Rights Reserved
- *
- * @par License:
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
 #include <config.h>
@@ -67,7 +53,7 @@ void sstp_usage_die(const char *prog, int code,
     int ret = (-1);
 
     printf("%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
-    printf("Copyright (C) Eivind Naess 2011-2021, All Rights Reserved\n\n");
+    printf("Copyright (C) Eivind Næss 2011-2022, All Rights Reserved\n\n");
     printf("License GPLv2+: GNU GPL version 2 or later <http://gnu.org/licenses/gpl.html>\n");
     printf("This is free software: you are free to change and redistribute it.\n");
     printf("There is NO WARRANTY, to the extent permitted by law.\n\n");
@@ -93,6 +79,7 @@ void sstp_usage_die(const char *prog, int code,
     printf("  --proxy                  Proxy URL\n");
     printf("  --user                   Username\n");
     printf("  --save-server-route      Add route to VPN server\n");
+    printf("  --speed                  The baudrate to supply pppd\n");
     printf("  --uuid                   The connection id\n");
     printf("  --tls-ext                Enable TLS hostname extension\n");
     printf("  --version                Display the version information\n\n");
@@ -142,10 +129,42 @@ static void sstp_scramble(char *arg)
 
 
 /*!
+ * @brief Validate the input baudrate to be used. Some OS allows any value to be used, Linux limits these to the common baud-rates
+ */
+static int sstp_baudrate(int value)
+{
+#ifdef __linux__
+    switch (value) {
+    case 110:
+    case 300:
+    case 600:
+    case 1200:
+    case 2400:
+    case 4800:
+    case 9600:
+    case 14400:
+    case 19200:
+    case 38400:
+    case 57600:
+    case 115200:
+    case 128000:
+    case 256000:
+        return value;
+    default:
+        return 38400;
+    }
+#endif
+    return value;
+}
+
+
+/*!
  * @brief Handle the individual options here
  */
 static void sstp_parse_option(sstp_option_st *ctx, int argc, char **argv, int index)
 {
+    int value = 0;
+
     switch (index)
     {
     case 0:
@@ -228,6 +247,13 @@ static void sstp_parse_option(sstp_option_st *ctx, int argc, char **argv, int in
         ctx->crl_path = strdup(optarg);
         break;
 
+    case 19:
+        errno = 0;
+        value = strtol(optarg, NULL, 10);
+        if (errno != ERANGE) {
+            ctx->speed = sstp_baudrate(value);
+        }
+        break;
     default:
         sstp_usage_die(argv[0], -1, "Unrecognized command line option");
         break;
@@ -304,11 +330,13 @@ int sstp_parse_argv(sstp_option_st *ctx, int argc, char **argv)
         { "version",        no_argument,       NULL, 'v' },
         { "crl-file",       required_argument, NULL,  0  },
         { "crl-path",       required_argument, NULL,  0  },
+        { "speed",          required_argument, NULL,  0  },
         { 0, 0, 0, 0 }
     };
 
     /* Clear the option structure */
     memset(ctx, 0, sizeof(sstp_option_st));
+    ctx->speed = 38400;
 
     while (1)
     {

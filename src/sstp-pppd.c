@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*!
  * @brief Managing the interface with pppd
  *
@@ -5,21 +6,6 @@
  *
  * @author Copyright (C) 2011 Eivind Naess, 
  *      All Rights Reserved
- *
- * @par License:
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
 #include <config.h>
@@ -29,6 +15,8 @@
 #include <unistd.h>
 #include <paths.h>
 #include <stdbool.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include "sstp-private.h"
 
@@ -62,8 +50,8 @@ struct sstp_pppd
 
     /*< The notify function */
     sstp_pppd_fn notify;
-    
-    /*< The argument to pass to this function */
+
+    /*< The argument to pass to the notify function */
     void *arg;
 
     /*< The socket to pppd */
@@ -95,6 +83,9 @@ struct sstp_pppd
 
     /*< The number of bytes received */
     unsigned long long recv_bytes;
+
+    /*< First read from pppd */
+    bool first;
 };
 
 
@@ -133,7 +124,7 @@ static void ppp_send_complete(sstp_stream_st *stream, sstp_buff_st *buf,
 {
     if (SSTP_OKAY != status)
     {
-        log_err("TODO: Handle shutdown here");
+        log_err("Failed to complete write to pppd");
     }
 
     /* Continue processing input */
@@ -154,7 +145,7 @@ static void ppp_send_complete(sstp_stream_st *stream, sstp_buff_st *buf,
 
     case SSTP_FAIL:
     default:
-        log_err("TODO: Handle processing failure");
+        log_err("Failed to receive data from pppd");
         break;
     }
 }
@@ -322,9 +313,9 @@ static void sstp_pppd_check_auth(sstp_pppd_st* ctx, sstp_buff_st *tx)
  */
 static status_t ppp_process_data(sstp_pppd_st *ctx)
 {
+    status_t ret;
     sstp_buff_st *rx = ctx->rx_buf;
     sstp_buff_st *tx = ctx->tx_buf;
-    status_t ret = SSTP_FAIL;
 
     /* Initialize TX-buffer */
     sstp_buff_reset(tx);
@@ -351,7 +342,7 @@ static status_t ppp_process_data(sstp_pppd_st *ctx)
         {
             /* We needed to read more ... */
             if (SSTP_OVERFLOW == ret ||
-               (rx->len == (rx->off + off))) // TODO: Why!?!
+               (rx->len == (rx->off + off)))
             {
                 /* Move current packet to beginning of buffer */
                 memmove(rx->data, rx->data + rx->off, rx->len - rx->off);
@@ -419,6 +410,12 @@ static void sstp_pppd_recv(int fd, short event, sstp_pppd_st *ctx)
     sstp_buff_st *rx = ctx->rx_buf;
     status_t ret = SSTP_FAIL;
 
+    /* Notifiy the caller pppd is configured and running */
+    if (ctx->first) {
+        ctx->notify(ctx->arg, SSTP_PPP_START);
+        ctx->first = false;
+    }
+
     /* Receive a chunk */
     rx->len += read(fd, rx->data + rx->len, rx->max - rx->len);
     if (rx->len <= 0)
@@ -445,7 +442,7 @@ static void sstp_pppd_recv(int fd, short event, sstp_pppd_st *ctx)
 
     case SSTP_FAIL:
     default:
-        log_err("TODO: Handle failure of processing");
+        log_err("Failed to receive data from pppd");
         break;
     }
 
@@ -503,11 +500,11 @@ done:
 }
 
 
-status_t sstp_pppd_start(sstp_pppd_st *ctx, sstp_option_st *opts, 
+status_t sstp_pppd_start(sstp_pppd_st *ctx, sstp_option_st *opts,
         const char *sockname)
 {
+    status_t ret;
     status_t status  = SSTP_FAIL;
-    status_t ret     = SSTP_FAIL;
 
     /* Launch PPPd, unless PPPd launched us */
     if (!(SSTP_OPT_NOLAUNCH & opts->enable))
@@ -515,6 +512,9 @@ status_t sstp_pppd_start(sstp_pppd_st *ctx, sstp_option_st *opts,
         const char *args[20];
         int i = 0;
         int j = 0;
+        char speed[10];
+
+        snprintf(speed, sizeof(speed)-1, "%u", opts->speed);
  
         /* Create the task */
         ret = sstp_task_new(&ctx->task, SSTP_TASK_USEPTY);
@@ -527,7 +527,7 @@ status_t sstp_pppd_start(sstp_pppd_st *ctx, sstp_option_st *opts,
         /* Configure the command line */
         args[i++] = "/usr/sbin/pppd";
         args[i++] = sstp_task_ttydev(ctx->task);
-        args[i++] = "38400";
+        args[i++] = speed;
 
         /* Write user to file */
         if (opts->user)
@@ -541,6 +541,8 @@ status_t sstp_pppd_start(sstp_pppd_st *ctx, sstp_option_st *opts,
         {
             int fd = 0;
             char buff[255];
+            /* 077, all new files created will only be read-/write- able by current user */
+            mode_t mode = umask(S_IRWXG | S_IRWXO);
 
             sprintf(ctx->tmpfile, "%s/sstp-pppd.XXXXXX", SSTP_TMP_PATH);
 
@@ -551,6 +553,9 @@ status_t sstp_pppd_start(sstp_pppd_st *ctx, sstp_option_st *opts,
                 log_err("Could not create pppd script");
                 goto done;
             }
+
+            /* Restore the umask */
+            umask(mode);
 
             /* Dump password to temporary file */
             j = snprintf(buff, sizeof(buff), "password \"%s\"\n", opts->password);
@@ -597,12 +602,18 @@ status_t sstp_pppd_start(sstp_pppd_st *ctx, sstp_option_st *opts,
         }
 
         /* Get the socket to listen on */
-        ctx->sock    = sstp_task_stdout(ctx->task);
+        ctx->sock = sstp_task_stdout(ctx->task);
+
+        /* Wait until pppd is configured and running before resuming recv() on SSTP stream */
+        status = SSTP_INPROG;
     }
     else
     {
         /* pppd is our parent, we communciate over a pty terminal */
         ctx->sock = STDIN_FILENO;
+
+        /* Success! */
+        status = SSTP_OKAY;
     }
 
     /* Need to record approximate time */
@@ -615,12 +626,9 @@ status_t sstp_pppd_start(sstp_pppd_st *ctx, sstp_option_st *opts,
     /* Add the receive event */
     event_add(ctx->ev_recv, NULL);
 
-    /* Success! */
-    status = SSTP_OKAY;
-
 done:
 
-    return (status);
+    return status;
 }
 
 
@@ -674,6 +682,7 @@ status_t sstp_pppd_create(sstp_pppd_st **ctx, event_base_st *base,
     (*ctx)->notify = notify_cb;
     (*ctx)->arg    = arg;
     (*ctx)->ev_base= base;
+    (*ctx)->first  = true;
 
     /* Success */
     status = SSTP_OKAY;

@@ -4,7 +4,7 @@ Upstream-Contact: Eivind Naess <eivnaes@yahoo.com>
 Source: https://gitlab.com/eivnaes/sstp-client
 
 Files: *
-Copyright: 2011-2021, Eivind Naess <eivnaes@yahoo.com>
+Copyright: 2011-2022, Eivind Naess <eivnaes@yahoo.com>
 License: GPL-2+ with OpenSSL exception
   This program is free software; you can redistribute it and/or modify it
   under the terms of the GNU General Public License as published by the

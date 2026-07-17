@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*!
  * @brief Plugin for pppd to relay the MPPE keys to sstp-client
  *
@@ -5,25 +6,11 @@
  *
  * @author Copyright (C) 2011 Eivind Naess, 
  *      All Rights Reserved
- *
- * @par License:
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
 #include <config.h>
 #include <errno.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -31,15 +18,9 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#define USE_EAPTLS
-#include <pppd/pppd.h>
-#include <pppd/fsm.h>
-#include <pppd/lcp.h>
-#include <pppd/eap.h>
-#include <pppd/chap-new.h>
-
 #include <sstp-api.h>
-#include <sstp-mppe.h>
+
+#include "sstp-pppd-compat.h"
 
 #define SSTP_MAX_BUFLEN             255
 
@@ -47,13 +28,12 @@
 #define PPP_PROTO_CHAP              0xc223
 #define PPP_PROTO_EAP               0xc227
 
-
 #define SSTP_MPPE_MAX_KEYSIZE 32
 
 /*!
  * @brief PPP daemon requires this symbol to be exported
  */
-const char pppd_version [] = VERSION;
+const char pppd_version [] = PPPD_VERSION;
 
 /*! The socket we send sstp-client our MPPE keys */
 static char sstp_sock[SSTP_MAX_BUFLEN+1];
@@ -79,10 +59,6 @@ static void sstp_send_notify()
     uint8_t buf[SSTP_MAX_BUFLEN+1];
     sstp_api_msg_st  *msg  = NULL;
 
-    unsigned char key[SSTP_MPPE_MAX_KEYSIZE];
-    char key_buf[128];
-    int key_len;
-
     /* Open the socket */
     sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sock < 0) {
@@ -90,8 +66,9 @@ static void sstp_send_notify()
     }
 
     /* Setup the address */
+    memset(&addr, 0, sizeof(struct sockaddr_un));
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, sstp_sock, sizeof(addr.sun_path));
+    strncpy(addr.sun_path, sstp_sock, sizeof(addr.sun_path)-1);
 
     /* Connect the socket */
     ret = connect(sock, (struct sockaddr*) &addr, alen);
@@ -105,11 +82,13 @@ static void sstp_send_notify()
     
     /* If the MPPE keys are set, add them to the message */
     if (mppe_keys_isset()) {
+        unsigned char key[SSTP_MPPE_MAX_KEYSIZE];
+        int key_len;
     
         key_len = mppe_get_send_key(key, sizeof(key));
         if (key_len > 0) {
             sstp_api_attr_add(msg, SSTP_API_ATTR_MPPE_SEND, key_len, key);
-            if (debug) {
+            if (debug_on()) {
                 dbglog("The mppe send key (%d): %0.*B", key_len, key_len, key);
             }
         }
@@ -117,7 +96,7 @@ static void sstp_send_notify()
         key_len = mppe_get_recv_key(key, sizeof(key));
         if (key_len > 0) {
             sstp_api_attr_add(msg, SSTP_API_ATTR_MPPE_RECV, key_len, key);
-            if (debug) {
+            if (debug_on()) {
                 dbglog("The mppe recv key (%d): %0.*B", key_len, key_len, key);
             }
         }
@@ -143,7 +122,7 @@ static void sstp_send_notify()
     close(sock);
 }
 
-#ifdef USE_PPPD_AUTH_HOOK
+#if HAVE_AUTH_NOTIFIER_SUPPORT
 /**
  * The introduction of pppd-2.4.9 now supports the callback via auth_up_notifier
  *    which previously was only done when peer had authenticated itself (server side).
@@ -245,7 +224,7 @@ static void sstp_snoop_recv(unsigned char *buf, int len)
     /* Disable the send-hook */
     snoop_recv_hook = NULL;
 }
-#endif // USE_PPPD_AUTH_HOOK
+#endif // #ifndef HAVE_AUTH_NOTIFIER_SUPPORT
 
 /*!
  * @brief PPP daemon requires this symbol to be exported for initialization
@@ -256,16 +235,16 @@ void plugin_init(void)
     memset(&sstp_sock, 0, sizeof(sstp_sock));
 
     /* Allow us to intercept options */
-    add_options(sstp_option);
+    ppp_add_options(sstp_option);
 
-#ifdef USE_PPPD_AUTH_HOOK
-    add_notifier(&auth_up_notifier, sstp_auth_done, NULL);
+#if HAVE_AUTH_NOTIFIER_SUPPORT
+    ppp_add_notify(NF_AUTH_UP, sstp_auth_done, NULL);
 #else
     /* Let's snoop for CHAP authentication */
     snoop_recv_hook = sstp_snoop_recv;
 
     /* Add ip-up notifier */
-    add_notifier(&ip_up_notifier, sstp_ip_up, NULL);
+    ppp_add_notify(NF_IP_UP, sstp_ip_up, NULL);
 #endif
 }
 

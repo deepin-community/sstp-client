@@ -1,6 +1,8 @@
 # Sstp-Client
 Sstp-Client is an SSTP client for Linux. It can be used to establish a SSTP connection to a Windows 2008 Server.
-This software is similar commandline and configuration as the pptp-client software.
+
+[![Download sstp-client](https://img.shields.io/sourceforge/dm/sstp-client.svg)](https://sourceforge.net/projects/sstp-client/files/latest/download)
+[![Coverity Scan Build Status](https://scan.coverity.com/projects/27442/badge.svg)](https://scan.coverity.com/projects/sstp-client)
 
 ## Background
 SSTP is Microsofts Remote Access Solution (RAS) for PPP over SSL. It can be used
@@ -48,7 +50,7 @@ Connection to a Windows Server or an Azure VNetGway is possible using EAP-TLS, b
 pppd 2.4.9. Code is already in place in upstream versions of pppd for this to work, including PEAP-TLS.
 
 For additional information and examples, please visit the wiki page for this project.
-  https://gitlab.com/eivnaes/sstp-client/-/wikis
+  https://gitlab.com/sstp-project/sstp-client/-/wikis
 
 ## Compiling:
 To compile this on your favorite distribution make sure you have the development tools and headers available. This
@@ -69,7 +71,5 @@ For example:
  * The SSTP specification: http://msdn.microsoft.com/en-us/library/cc247338%28v=prot.10%29.aspx
  * A reference to the pptp-client software, this has much in common with the SSTP project, e.g. command line. http://pptpclient.sourceforge.net/
  * OpenSSL Examples: http://www.rtfm.com/openssl-examples/
- * MicroTik have a working server and client version in the router software (as of March 2010).
+ * MikroTik have a working server and client version in the router software (as of March 2010).
  * SSToPer is another SSTP client, but doesn't support Async HDLC frames
-
-

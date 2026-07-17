@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*!
  * @brief This is the sstp-client code
  *
@@ -5,21 +6,6 @@
  *
  * @author Copyright (C) 2011 Eivind Naess, 
  *      All Rights Reserved
- *
- * @par License:
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
 #include <config.h>
@@ -104,6 +90,10 @@ static void sstp_client_pppd_cb(sstp_client_st *client, sstp_pppd_event_t ev)
 
     switch (ev)
     {
+    case SSTP_PPP_START:
+        sstp_state_resume_recv(client->state);
+        break;
+
     case SSTP_PPP_DOWN:
         log_err("PPPd terminated");
         //sstp_state_disconnect(client->state);
@@ -150,9 +140,10 @@ static void sstp_client_pppd_cb(sstp_client_st *client, sstp_pppd_event_t ev)
 /*!
  * @brief Called when the state machine transitions
  */
-static void sstp_client_state_cb(sstp_client_st *client, sstp_state_t event)
+static status_t sstp_client_state_cb(void *arg, sstp_state_t event)
 {
-    int ret = 0;
+    sstp_client_st *client = (sstp_client_st*) arg;
+    status_t ret = SSTP_OKAY;
 
     switch (event)
     {
@@ -169,7 +160,7 @@ static void sstp_client_state_cb(sstp_client_st *client, sstp_state_t event)
         /* Start the pppd daemon */
         ret = sstp_pppd_start(client->pppd, &client->option, 
                 sstp_event_sockname(client->event));
-        if (SSTP_OKAY != ret)
+        if (SSTP_FAIL == ret)
         {
             sstp_die("Could not start PPP daemon", -1);
         }
@@ -179,7 +170,7 @@ static void sstp_client_state_cb(sstp_client_st *client, sstp_state_t event)
                 sstp_pppd_send, client->pppd);
 
         log_info("Started PPP Link Negotiation");
-        break;
+        return ret;
     
     case SSTP_CALL_ESTABLISHED:
 
@@ -196,20 +187,19 @@ static void sstp_client_state_cb(sstp_client_st *client, sstp_state_t event)
                 log_warn("Could not enter privilege directory");
             }
         }
-
         break;
 
     case SSTP_CALL_ABORT:
     default:
 
-	if (client->pppd) 
+        if (client->pppd)
         {
-	    sstp_pppd_stop(client->pppd);
+	        sstp_pppd_stop(client->pppd);
         }
-        sstp_die("Connection was aborted, %s", -1, 
+        sstp_die("Connection was aborted, %s", -1,
                 sstp_state_reason(client->state));
-        break;
     }
+    return ret;
 }
 
 
@@ -248,7 +238,7 @@ static void sstp_client_http_done(sstp_client_st *client, int status)
     }
 
     /* Now we need to start the state-machine */
-    status = sstp_state_create(&client->state, client->stream, (sstp_state_change_fn)
+    status = sstp_state_create(&client->state, client->stream,
             sstp_client_state_cb, client, SSTP_MODE_CLIENT);
     if (SSTP_OKAY != status)
     {
@@ -328,8 +318,8 @@ static void sstp_client_proxy_done(sstp_client_st *client, int status)
             sstp_die("Could not create I/O stream", -1);
         }
 
-        /* Proxy asked us to authenticate, but we have no password */
-        if (!client->url->password || !client->url->password)
+        /* Proxy asked us to authenticate, but we have no user or password */
+        if (!client->url->user || !client->url->password)
         {
             sstp_die("Proxy asked for credentials, none provided", -1);
         }
@@ -339,7 +329,7 @@ static void sstp_client_proxy_done(sstp_client_st *client, int status)
                 client->url->password);
 
         /* Reconnect to the proxy (now with credentials set) */
-        ret = sstp_stream_connect(client->stream, (struct sockaddr*) &client->host.addr, client->host.alen,
+        sstp_stream_connect(client->stream, (struct sockaddr*) &client->host.addr, client->host.alen,
                 (sstp_complete_fn) sstp_client_proxy_connected, client, 10);
         break;
 
@@ -434,7 +424,7 @@ static status_t sstp_client_connect(sstp_client_st *client,
         {
             /* Use the host per --host option, if specified */
             strncpy(client->host.name, opts->host, 
-                    sizeof(client->host.name));
+                    sizeof(client->host.name)-1);
         }
         complete_cb = sstp_client_connected;
     }
@@ -687,7 +677,7 @@ static status_t sstp_client_lookup(sstp_url_st *uri, sstp_peer_st *peer)
     }
 
     /* Save the results for later */
-    strncpy(peer->name, (list->ai_canonname) ? : uri->host, sizeof(peer->name));
+    strncpy(peer->name, (list->ai_canonname) ? : uri->host, sizeof(peer->name)-1);
     peer->alen = list->ai_addrlen;
     memcpy(&peer->addr, list->ai_addr, peer->alen);
 
