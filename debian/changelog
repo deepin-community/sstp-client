@@ -1,9 +1,3 @@
-sstp-client (1.0.20-2) unstable; urgency=medium
-
-  * Rebuild with LTO enabled (dpkg vendor feature optimize/lto).
-
- -- tunaichao <tunaichao@uniontech.com>  Fri, 11 Sep 2026 18:04:48 +0800
-
 sstp-client (1.0.20-1) unstable; urgency=medium
 
   [ Eivind Næss ]
